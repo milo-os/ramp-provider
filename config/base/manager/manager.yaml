@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ramp-provider-manager
+  labels:
+    control-plane: ramp-provider
+    app.kubernetes.io/name: ramp-provider
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  selector:
+    matchLabels:
+      control-plane: ramp-provider
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: ramp-provider
+        app.kubernetes.io/name: ramp-provider
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+      - command:
+        - /manager
+        args:
+          - --metrics-bind-address=$(METRICS_BIND_ADDRESS)
+          - --health-probe-bind-address=$(HEALTH_PROBE_BIND_ADDRESS)
+          - --leader-elect=$(LEADER_ELECT)
+          - --milo-kubeconfig=$(MILO_KUBECONFIG)
+          - --leader-election-namespace=$(LEADER_ELECTION_NAMESPACE)
+          - --ramp-endpoint=$(RAMP_ENDPOINT)
+          - --ramp-token-url=$(RAMP_TOKEN_URL)
+          - --ramp-client-id-file=$(RAMP_CLIENT_ID_FILE)
+          - --ramp-client-secret-file=$(RAMP_CLIENT_SECRET_FILE)
+          - --resync-interval=$(RESYNC_INTERVAL)
+        env:
+          - name: METRICS_BIND_ADDRESS
+            value: ":8080"
+          - name: HEALTH_PROBE_BIND_ADDRESS
+            value: ":8081"
+          - name: LEADER_ELECT
+            value: "true"
+          # MILO_KUBECONFIG and LEADER_ELECTION_NAMESPACE default to empty so
+          # the manager falls back to the in-cluster client and
+          # controller-runtime's auto-detected lease namespace. Deployments
+          # that aggregate this controller into Milo override these via a
+          # strategic merge patch on env.
+          - name: MILO_KUBECONFIG
+            value: ""
+          - name: LEADER_ELECTION_NAMESPACE
+            value: ""
+          # Ramp endpoint defaults can be overridden for sandbox via env.
+          - name: RAMP_ENDPOINT
+            value: "https://api.ramp.com"
+          - name: RAMP_TOKEN_URL
+            value: "https://api.ramp.com/developer/v1/token"
+          # Credentials are loaded from files mounted out of a Secret. The
+          # default paths line up with the standard `ramp-credentials`
+          # mount below; operators that mount their Secret somewhere else
+          # override these via env.
+          - name: RAMP_CLIENT_ID_FILE
+            value: "/etc/ramp/client_id"
+          - name: RAMP_CLIENT_SECRET_FILE
+            value: "/etc/ramp/client_secret"
+          - name: RESYNC_INTERVAL
+            value: "24h"
+        image: ghcr.io/milo-os/ramp-provider:latest
+        name: manager
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - "ALL"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        volumeMounts:
+          - name: ramp-credentials
+            mountPath: /etc/ramp
+            readOnly: true
+      volumes:
+        - name: ramp-credentials
+          secret:
+            secretName: ramp-credentials
+            optional: false
+            items:
+              - key: client_id
+                path: client_id
+              - key: client_secret
+                path: client_secret
+      serviceAccountName: ramp-provider-manager
+      terminationGracePeriodSeconds: 10

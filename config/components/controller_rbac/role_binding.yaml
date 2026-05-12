@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ramp-provider-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ramp-provider-manager
+subjects:
+- kind: ServiceAccount
+  name: ramp-provider-manager
+  # The namespace is filled in by the kustomization that includes this
+  # component (it depends on where the ServiceAccount is deployed).
+  namespace: ramp-provider-system

@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: ramp-provider
+    app.kubernetes.io/managed-by: kustomize
+  name: ramp-provider-leader-election
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ramp-provider-leader-election
+subjects:
+- kind: ServiceAccount
+  name: ramp-provider-manager
