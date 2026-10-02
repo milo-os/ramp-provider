@@ -4,6 +4,7 @@ package main
 
 import (
 	"flag"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -139,10 +140,12 @@ func main() {
 		Metrics: metricsserver.Options{
 			BindAddress: metricsAddr,
 		},
-		HealthProbeBindAddress:  probeAddr,
-		LeaderElection:          enableLeaderElection,
-		LeaderElectionID:        "ramp-provider.compliance.miloapis.com",
-		LeaderElectionNamespace: leaderElectionNamespace,
+		HealthProbeBindAddress:        probeAddr,
+		LeaderElection:                enableLeaderElection,
+		LeaderElectionID:              "ramp-provider.compliance.miloapis.com",
+		LeaderElectionNamespace:       leaderElectionNamespace,
+		LeaderElectionConfig:          leaderElectionRestConfig(restCfg),
+		LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -195,4 +198,21 @@ func resolveCredential(literal, path, envVar string) (string, error) {
 		return strings.TrimRight(string(data), " \t\r\n"), nil
 	}
 	return os.Getenv(envVar), nil
+}
+
+const (
+	leaderElectionQPS   = 5
+	leaderElectionBurst = 10
+)
+
+func leaderElectionRestConfig(base *rest.Config) *rest.Config {
+	cfg := rest.CopyConfig(base)
+	cfg.RateLimiter = nil
+	cfg.QPS = leaderElectionQPS
+	cfg.Burst = leaderElectionBurst
+	cfg.Dial = (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
+	return cfg
 }
