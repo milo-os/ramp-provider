@@ -2,6 +2,8 @@ module go.miloapis.com/ramp-provider
 
 go 1.27.0
 
+toolchain go1.27.3
+
 require (
 	github.com/go-logr/logr v1.4.4
 	k8s.io/apimachinery v0.37.2
